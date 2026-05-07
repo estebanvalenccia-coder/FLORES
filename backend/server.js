@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
 const PORT = process.env.PORT || 3001;
-const XAI_MODEL = process.env.XAI_MODEL || "grok-4.3";
+const LLAMA_MODEL = process.env.LLAMA_MODEL || "llama-3.3-70b-versatile";
 const NANO_BANANA_MODEL = process.env.NANO_BANANA_MODEL || "nano-banana";
 
 function broadcast(payload) {
@@ -35,27 +35,28 @@ app.get("/api/status", (_, res) => {
   res.json({
     ok: true,
     mode: "LAN",
-    grok: Boolean(process.env.XAI_API_KEY),
+    llama: Boolean(process.env.GROQ_API_KEY),
+    model: LLAMA_MODEL,
     nanoBanana: Boolean(process.env.NANO_BANANA_API_KEY),
   });
 });
 
 app.post("/api/grok/bouquet", async (req, res) => {
-  if (!process.env.XAI_API_KEY) {
-    return res.status(400).json({ error: "XAI_API_KEY no configurada" });
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(400).json({ error: "GROQ_API_KEY no configurada" });
   }
 
   try {
     const prompt = buildBouquetPrompt(req.body || {});
 
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.XAI_API_KEY}`,
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: XAI_MODEL,
+        model: LLAMA_MODEL,
         stream: false,
         temperature: 0.7,
         messages: [
@@ -70,7 +71,7 @@ app.post("/api/grok/bouquet", async (req, res) => {
 
     if (!response.ok) {
       const detail = await response.text();
-      return res.status(502).json({ error: `Error de Grok: ${detail}` });
+      return res.status(502).json({ error: `Error de Groq/Llama: ${detail}` });
     }
 
     const data = await response.json();
@@ -81,7 +82,7 @@ app.post("/api/grok/bouquet", async (req, res) => {
     broadcast({ type: "bouquet:proposal", payload: result });
     res.json({ result });
   } catch (error) {
-    res.status(500).json({ error: error.message || "Error generando propuesta con Grok" });
+    res.status(500).json({ error: error.message || "Error generando propuesta con Llama" });
   }
 });
 
@@ -131,16 +132,16 @@ app.post("/api/bouquet/full", async (req, res) => {
   const baseUrl = `http://127.0.0.1:${PORT}`;
 
   try {
-    const grokResponse = await fetch(`${baseUrl}/api/grok/bouquet`, {
+    const llamaResponse = await fetch(`${baseUrl}/api/grok/bouquet`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body || {}),
     });
-    const grokData = await grokResponse.json();
+    const llamaData = await llamaResponse.json();
 
-    if (!grokResponse.ok) return res.status(grokResponse.status).json(grokData);
+    if (!llamaResponse.ok) return res.status(llamaResponse.status).json(llamaData);
 
-    const imagePrompt = grokData.result?.imagePrompt;
+    const imagePrompt = llamaData.result?.imagePrompt;
     const imageResponse = await fetch(`${baseUrl}/api/nano-banana/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -148,9 +149,9 @@ app.post("/api/bouquet/full", async (req, res) => {
     });
     const imageData = await imageResponse.json();
 
-    if (!imageResponse.ok) return res.status(imageResponse.status).json({ proposal: grokData.result, imageError: imageData.error });
+    if (!imageResponse.ok) return res.status(imageResponse.status).json({ proposal: llamaData.result, imageError: imageData.error });
 
-    res.json({ proposal: grokData.result, image: imageData });
+    res.json({ proposal: llamaData.result, image: imageData });
   } catch (error) {
     res.status(500).json({ error: error.message || "Error creando ramo completo" });
   }
