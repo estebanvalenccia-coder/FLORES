@@ -1,18 +1,21 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { CalendarDays, ChevronRight, Flower2, Gift, Heart, ImageIcon, Loader2, Palette, Rotate3D, Send, Sparkles, Wand2 } from "lucide-react";
+import { CalendarDays, ChevronRight, Flower2, Gift, Heart, Loader2, Palette, Rotate3D, Send, Sparkles, Wand2 } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API_BASE = (import.meta.env.VITE_API_URL || "https://herenciapp-market-production.up.railway.app").replace(/\/$/, "");
 
 type Proposal = {
   title?: string;
+  name?: string;
   description?: string;
   imagePrompt?: string;
   recommendedFlowers?: string[];
   sellingTips?: string;
+  sellingTip?: string;
 };
 
 type Result = {
   proposal?: Proposal;
+  result?: Proposal;
   image?: {
     imageUrl?: string;
   };
@@ -53,10 +56,15 @@ export function ClientExperience() {
   const [idea, setIdea] = useState("Quiero un ramo alegre y romántico con peonías, rosas y flores silvestres en tonos rosa y coral");
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sentMessage, setSentMessage] = useState("");
 
   const selectedSummary = useMemo(() => {
     return `${occasion} · ${style} · ${budget}€ · ${colors.join(", ")} · ${flowers.join(", ")}`;
   }, [budget, colors, flowers, occasion, style]);
+
+  const proposal = result?.proposal || result?.result;
+  const proposalTitle = proposal?.title || proposal?.name || "Ramo personalizado con IA";
 
   const toggle = (value: string, list: string[], setter: (next: string[]) => void) => {
     setter(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
@@ -65,31 +73,94 @@ export function ClientExperience() {
   const generateBouquet = async () => {
     setLoading(true);
     setResult(null);
+    setSentMessage("");
 
     try {
-      const response = await fetch(`${API_BASE}/api/bouquet/full`, {
+      const response = await fetch(`${API_BASE}/api/ai/bouquet-full`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ occasion, style, budget, colors, flowers, description: idea, aspectRatio: "1:1" }),
+        body: JSON.stringify({
+          occasion,
+          style,
+          budget,
+          color: colors.join(", "),
+          colors,
+          flowers,
+          description: idea,
+          aspectRatio: "1:1",
+        }),
       });
 
       const data = await readJsonSafely(response);
+
+      if (!response.ok) {
+        setResult({ error: data.error || `No se pudo generar el ramo (${response.status})` });
+        return;
+      }
+
       setResult(data);
     } catch {
-      setResult({ error: "No se pudo conectar con el servidor interno. Revisa que el backend esté encendido." });
+      setResult({ error: "No se pudo conectar con Railway. Revisa VITE_API_URL y CORS_ORIGIN." });
     } finally {
       setLoading(false);
     }
   };
 
-  const sendToAdmin = () => {
-    const wsUrl = API_BASE.replace("http", "ws");
-    const socket = new WebSocket(wsUrl);
+  const sendToAdmin = async () => {
+    setSending(true);
+    setSentMessage("");
 
-    socket.onopen = () => {
-      socket.send(JSON.stringify({ type: "client:bouquet-request", payload: { selectedSummary, occasion, style, budget, colors, flowers, result, createdAt: new Date().toISOString() } }));
-      socket.close();
-    };
+    try {
+      const response = await fetch(`${API_BASE}/api/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: "Cliente tablet FLORES",
+          customerEmail: "",
+          paymentMethod: "manual",
+          deliveryMethod: "recogida",
+          status: "pending",
+          subtotal: budget,
+          shipping: 0,
+          total: budget,
+          items: [
+            {
+              name: proposalTitle,
+              quantity: 1,
+              price: budget,
+              image: result?.image?.imageUrl || "",
+            },
+          ],
+          metadata: {
+            source: "FLORES_TABLET",
+            selectedSummary,
+            occasion,
+            style,
+            budget,
+            colors,
+            flowers,
+            idea,
+            proposal: proposal || null,
+            image: result?.image || null,
+            createdAt: new Date().toISOString(),
+          },
+        }),
+      });
+
+      const data = await readJsonSafely(response);
+
+      if (!response.ok) {
+        setSentMessage(data.error || `No se pudo enviar al admin (${response.status})`);
+        return;
+      }
+
+      setSentMessage("Enviado al admin de Herencia Market ✅");
+    } catch {
+      setSentMessage("No se pudo conectar con el backend de Herencia Market.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -138,7 +209,7 @@ export function ClientExperience() {
           </div>
 
           <div className="hero-bouquet-card">
-            {result?.image?.imageUrl ? <img src={result.image.imageUrl} alt={result.proposal?.title || "Ramo generado"} /> : <div className="bouquet-illustration"><span>🌸</span><span>🌺</span><span>🌼</span><span>🌿</span></div>}
+            {result?.image?.imageUrl ? <img src={result.image.imageUrl} alt={proposalTitle} /> : <div className="bouquet-illustration"><span>🌸</span><span>🌺</span><span>🌼</span><span>🌿</span></div>}
             <div className="floating-heart">♡</div>
           </div>
         </section>
@@ -158,8 +229,12 @@ export function ClientExperience() {
 
           <InfoCard title="Precio estimado">
             <div className="big-price">{budget.toFixed(2).replace(".", ",")} €</div>
-            <button className="hot-button" onClick={sendToAdmin}><Send size={16} /> Añadir al pedido</button>
+            <button className="hot-button" onClick={sendToAdmin} disabled={sending}>
+              {sending ? <Loader2 className="spin" size={16} /> : <Send size={16} />}
+              {sending ? "Enviando..." : "Añadir al pedido"}
+            </button>
             <small className="muted">Incluye tarjeta personalizada</small>
+            {sentMessage && <small className="muted">{sentMessage}</small>}
           </InfoCard>
 
           <InfoCard title="Vista 360º del ramo">
