@@ -47,6 +47,33 @@ async function readJsonSafely(response: Response): Promise<Result> {
   }
 }
 
+async function postBouquetToRailway(payload: Record<string, unknown>) {
+  const routes = ["/api/ai/bouquet-full", "/api/bouquet/full"];
+  let lastData: Result = {};
+  let lastStatus = 0;
+
+  for (const route of routes) {
+    const response = await fetch(`${API_BASE}${route}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await readJsonSafely(response);
+
+    if (response.ok) return data;
+
+    lastData = data;
+    lastStatus = response.status;
+
+    const canTryFallback = response.status === 401 || response.status === 403 || response.status === 404;
+    if (!canTryFallback) break;
+  }
+
+  throw new Error(lastData.error || `No se pudo generar el ramo (${lastStatus})`);
+}
+
 export function ClientExperience() {
   const [occasion, setOccasion] = useState("Cumpleaños");
   const [style, setStyle] = useState("Alegre y romántico");
@@ -76,32 +103,21 @@ export function ClientExperience() {
     setSentMessage("");
 
     try {
-      const response = await fetch(`${API_BASE}/api/ai/bouquet-full`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          occasion,
-          style,
-          budget,
-          color: colors.join(", "),
-          colors,
-          flowers,
-          description: idea,
-          aspectRatio: "1:1",
-        }),
+      const data = await postBouquetToRailway({
+        occasion,
+        style,
+        budget,
+        color: colors.join(", "),
+        colors,
+        flowers,
+        description: idea,
+        aspectRatio: "1:1",
+        source: "FLORES_TABLET",
       });
 
-      const data = await readJsonSafely(response);
-
-      if (!response.ok) {
-        setResult({ error: data.error || `No se pudo generar el ramo (${response.status})` });
-        return;
-      }
-
       setResult(data);
-    } catch {
-      setResult({ error: "No se pudo conectar con Railway. Revisa VITE_API_URL y CORS_ORIGIN." });
+    } catch (error) {
+      setResult({ error: error instanceof Error ? error.message : "No se pudo conectar con Railway. Revisa VITE_API_URL y CORS_ORIGIN." });
     } finally {
       setLoading(false);
     }
