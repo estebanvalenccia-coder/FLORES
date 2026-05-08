@@ -1,6 +1,6 @@
 import { Flower2 } from "lucide-react";
 import { Routes, Route, Link } from "react-router-dom";
-import { AdminInventory } from "./AdminInventory";
+import { AdminPanel } from "./AdminPanel";
 import { ClientExperience } from "./ClientExperience";
 
 export function App() {
@@ -19,7 +19,7 @@ export function App() {
       </header>
 
       <Routes>
-        <Route path="/admin" element={<AdminInventory />} />
+        <Route path="/admin" element={<AdminPanel />} />
         <Route path="/clientes" element={<ClientExperience />} />
         <Route path="*" element={<ClientExperience />} />
       </Routes>
