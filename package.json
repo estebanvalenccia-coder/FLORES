@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "clean": "rm -rf node_modules/.vite .vite dist",
+    "clean": "node -e \"const fs=require('fs'); for (const p of ['node_modules/.vite','.vite','dist']) fs.rmSync(p,{recursive:true,force:true})\"",
     "dev": "npm run clean && vite --host 0.0.0.0",
     "backend": "node backend/server.js",
     "dev:full": "npm run clean && concurrently \"npm run backend\" \"vite --host 0.0.0.0\"",
