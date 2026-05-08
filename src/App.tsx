@@ -1,7 +1,7 @@
 import { Flower2 } from "lucide-react";
 import { Routes, Route, Link } from "react-router-dom";
 import { AdminInventory } from "./AdminInventory";
-import { ClientBouquetAI } from "./ClientBouquetAI";
+import { ClientExperience } from "./ClientExperience";
 
 export function App() {
   return (
@@ -20,8 +20,8 @@ export function App() {
 
       <Routes>
         <Route path="/admin" element={<AdminInventory />} />
-        <Route path="/clientes" element={<ClientBouquetAI />} />
-        <Route path="*" element={<ClientBouquetAI />} />
+        <Route path="/clientes" element={<ClientExperience />} />
+        <Route path="*" element={<ClientExperience />} />
       </Routes>
     </>
   );
