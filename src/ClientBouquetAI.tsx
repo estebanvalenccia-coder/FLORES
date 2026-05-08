@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Flower2, ImageIcon, Loader2, Send, Sparkles } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -24,6 +24,17 @@ const occasions = ["Romántico", "Cumpleaños", "Aniversario", "Boda", "Sorpresa
 const styles = ["Premium", "Elegante", "Moderno", "Silvestre", "Minimalista", "Clásico"];
 const colorOptions = ["Rojo", "Blanco", "Rosa", "Crema", "Verde", "Lila", "Pastel", "Naranja"];
 const flowerOptions = ["Rosas", "Tulipanes", "Eucalipto", "Paniculata", "Peonías", "Lirios", "Margaritas", "Hortensias"];
+
+async function readJsonSafely(response: Response): Promise<Result> {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text.slice(0, 300) || `Respuesta no válida del servidor (${response.status})` };
+  }
+}
 
 export function ClientBouquetAI() {
   const [occasion, setOccasion] = useState("Romántico");
@@ -53,7 +64,7 @@ export function ClientBouquetAI() {
         body: JSON.stringify({ occasion, style, budget, colors, flowers, aspectRatio: "1:1" }),
       });
 
-      const data = await response.json();
+      const data = await readJsonSafely(response);
       setResult(data);
     } catch {
       setResult({ error: "No se pudo conectar con el servidor interno. Revisa que el backend esté encendido." });
@@ -99,13 +110,21 @@ export function ClientBouquetAI() {
         <div className="client-panel">
           <Field title="Ocasión">
             <div className="pill-grid">
-              {occasions.map((item) => <button key={item} className={occasion === item ? "pill active" : "pill"} onClick={() => setOccasion(item)}>{item}</button>)}
+              {occasions.map((item) => (
+                <button key={item} className={occasion === item ? "pill active" : "pill"} onClick={() => setOccasion(item)}>
+                  {item}
+                </button>
+              ))}
             </div>
           </Field>
 
           <Field title="Estilo">
             <div className="pill-grid">
-              {styles.map((item) => <button key={item} className={style === item ? "pill active" : "pill"} onClick={() => setStyle(item)}>{item}</button>)}
+              {styles.map((item) => (
+                <button key={item} className={style === item ? "pill active" : "pill"} onClick={() => setStyle(item)}>
+                  {item}
+                </button>
+              ))}
             </div>
           </Field>
 
@@ -115,13 +134,21 @@ export function ClientBouquetAI() {
 
           <Field title="Colores">
             <div className="pill-grid">
-              {colorOptions.map((item) => <button key={item} className={colors.includes(item) ? "pill active" : "pill"} onClick={() => toggle(item, colors, setColors)}>{item}</button>)}
+              {colorOptions.map((item) => (
+                <button key={item} className={colors.includes(item) ? "pill active" : "pill"} onClick={() => toggle(item, colors, setColors)}>
+                  {item}
+                </button>
+              ))}
             </div>
           </Field>
 
           <Field title="Flores favoritas">
             <div className="pill-grid">
-              {flowerOptions.map((item) => <button key={item} className={flowers.includes(item) ? "pill active" : "pill"} onClick={() => toggle(item, flowers, setFlowers)}>{item}</button>)}
+              {flowerOptions.map((item) => (
+                <button key={item} className={flowers.includes(item) ? "pill active" : "pill"} onClick={() => toggle(item, flowers, setFlowers)}>
+                  {item}
+                </button>
+              ))}
             </div>
           </Field>
 
@@ -165,7 +192,7 @@ export function ClientBouquetAI() {
   );
 }
 
-function Field({ title, children }: { title: string; children: React.ReactNode }) {
+function Field({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="client-field">
       <h3>{title}</h3>
